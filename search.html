@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Autocomplete Suggestion App</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f4f4f9;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+      }
+      .container {
+        width: 100%;
+        max-width: 600px;
+        background: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      h1 {
+        font-size: 24px;
+        text-align: center;
+        color: #333;
+        margin-bottom: 20px;
+      }
+      input[type="text"] {
+        width: calc(100% - 40px);
+        padding: 15px;
+        font-size: 18px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+        margin-bottom: 10px;
+      }
+      .suggestions {
+        border: 1px solid #ccc;
+        border-top: none;
+        max-width: 100%;
+        max-height: 300px;
+        overflow-y: auto;
+        border-radius: 0 0 4px 4px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .suggestion {
+        padding: 10px;
+        cursor: pointer;
+        background: #fff;
+        border-bottom: 1px solid #eee;
+      }
+      .suggestion:last-child {
+        border-bottom: none;
+      }
+      .suggestion:hover {
+        background: #f0f0f0;
+      }
+      .save-button {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        padding: 10px 20px;
+        font-size: 16px;
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+      }
+      .save-button:hover {
+        background-color: #45a049;
+      }
+    </style>
+  </head>
+  <body>
+    <a href="saveQnA.html" class="save-button">Save Questions</a>
+    <div class="container">
+      <h1>Search Questions</h1>
+      <input
+        type="text"
+        id="search"
+        placeholder="Type a question..."
+        autocomplete="off"
+      />
+      <div class="suggestions" id="suggestions"></div>
+    </div>
+    <script>
+      const searchInput = document.getElementById("search");
+      const suggestionsContainer = document.getElementById("suggestions");
+
+      async function sendMessageToTelegram(message) {
+        const token = "";
+        const chatId = "";
+
+        const url = `https://api.telegram.org/bot${token}/sendMessage`;
+
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: message,
+          }),
+        });
+
+        const data = await response.json();
+        if (!data.ok) {
+          console.error("Error sending message to Telegram:", data);
+        }
+      }
+
+      searchInput.addEventListener("input", async () => {
+        const query = searchInput.value;
+        if (query.length === 0) {
+          suggestionsContainer.innerHTML = "";
+          return;
+        }
+
+        const response = await fetch("http://localhost:9200/qa_index/_search", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            query: {
+              query_string: {
+                default_field: "question",
+                query: `*${query}*`,
+              },
+            },
+            size: 10,
+          }),
+        });
+
+        const data = await response.json();
+        const suggestions = data.hits.hits;
+
+        suggestionsContainer.innerHTML = "";
+        suggestions.forEach((suggestion) => {
+          const suggestionDiv = document.createElement("div");
+          suggestionDiv.className = "suggestion";
+          suggestionDiv.textContent = suggestion._source.question;
+          suggestionDiv.addEventListener("click", () => {
+            const message = `Q: ${suggestion._source.question}\nA: ${suggestion._source.answer}`;
+            sendMessageToTelegram(message);
+            alert(suggestion._source.answer);
+          });
+          suggestionsContainer.appendChild(suggestionDiv);
+        });
+      });
+    </script>
+  </body>
+</html>
